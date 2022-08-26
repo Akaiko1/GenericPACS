@@ -1,9 +1,12 @@
 from pynetdicom import AE, evt, StoragePresentationContexts, \
     AllStoragePresentationContexts, ALL_TRANSFER_SYNTAXES, debug_logger
+from flask import Flask
 
 import config
 import pydicom
 import os
+
+app = Flask(__name__)
 
 
 def handle_store(event):
@@ -38,13 +41,8 @@ def handle_move(event):
 
         yield config.TRUSTED[ae_name][0], config.TRUSTED[ae_name][1]
 
-    instances = []
     matching = []
-
-    if config.STORAGE_TYPE == 'files':
-        fdir = config.STORAGE_DESTINATION
-        for fpath in os.listdir(fdir):
-            instances.append(pydicom.dcmread(os.path.join(fdir, fpath)))
+    instances = get_stored_instances()
 
     if config.DEBUG:
         print(len(instances))
@@ -77,13 +75,8 @@ def handle_find(event):
     # for elem in ds:
     #     print(ds[elem.tag])
 
-    instances = []
     matching = []
-
-    if config.STORAGE_TYPE == 'files':
-        fdir = config.STORAGE_DESTINATION
-        for fpath in os.listdir(fdir):
-            instances.append(pydicom.dcmread(os.path.join(fdir, fpath)))
+    instances = get_stored_instances()
 
     if config.DEBUG:
         print(len(instances))
@@ -116,6 +109,33 @@ def handle_find(event):
         yield 0xFF00, identifier
 
 
+def get_stored_instances():
+    instances = []
+    if config.STORAGE_TYPE == 'files':
+        fdir = config.STORAGE_DESTINATION
+        for fpath in os.listdir(fdir):
+            instances.append(pydicom.dcmread(os.path.join(fdir, fpath)))
+    return instances
+
+
+@app.route("/")
+def default_info():
+    instances = get_stored_instances()
+    instances = sorted(instances, key=lambda x: x.StudyInstanceUID)
+    report_string = ''
+
+    report_string += 'Following hosts are permitted to use C-MOVE:<br>'
+    for name, reqs in config.TRUSTED.items():
+        report_string += f'{name}: {reqs}<br>'
+
+    report_string += '<br>'
+
+    for idx, instance in enumerate(instances):
+        report_string += f'{idx}. Modality {instance.Modality}: StudyUID {instance.StudyInstanceUID}<br>'
+
+    return report_string
+
+
 def run():
     handlers = [(evt.EVT_C_STORE, handle_store),
                 (evt.EVT_C_MOVE, handle_move),
@@ -123,7 +143,7 @@ def run():
 
     ae = AE()
 
-    if config.DEBUG:
+    if config.USE_DEBUG_LOGGER:
         debug_logger()
 
     ae.add_supported_context('1.2.840.10008.5.1.4.1.2.1.1')
@@ -154,11 +174,12 @@ def run():
         for syntax in syntax_list:
             ae.add_requested_context(context, syntax)
 
-    if config.DEBUG:
-        for context in ae.requested_contexts:
-            print(context)
+    # if config.DEBUG:
+    #     for context in ae.requested_contexts:
+    #         print(context)
 
-    ae.start_server((config.IP, config.PORT), evt_handlers=handlers, block=True)
+    ae.start_server((config.IP, config.PORT), evt_handlers=handlers, block=False)
+    app.run(host=config.IP, port=config.PORT+2)
 
 
 if __name__ == '__main__':

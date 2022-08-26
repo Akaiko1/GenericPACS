@@ -6,7 +6,7 @@ from pynetdicom import AE, evt, debug_logger, ALL_TRANSFER_SYNTAXES, AllStorageP
 
 import config
 
-if config.DEBUG:
+if config.USE_DEBUG_LOGGER:
     debug_logger()
 
 
@@ -78,10 +78,9 @@ def run_test():
         assoc.release()
     else:
         print('Association rejected, aborted or never connected')
-
     print('C-FIND Test Finished')
-    assoc = ae.associate("0.0.0.0", config.PORT)
 
+    assoc = ae.associate("0.0.0.0", config.PORT)
     if assoc.is_established:
         # Use the C-MOVE service to send the identifier
         responses = assoc.send_c_move(ds, ae.ae_title, '1.2.840.10008.5.1.4.1.2.1.2')
@@ -95,6 +94,35 @@ def run_test():
         assoc.release()
     else:
         print('Association rejected, aborted or never connected')
+    print('C-MOVE Test Finished')
+
+    assoc = ae.associate("0.0.0.0", config.PORT)
+
+    instances = []
+    if config.STORAGE_TYPE == 'files':
+        fdir = config.STORAGE_DESTINATION
+        for fpath in os.listdir(fdir):
+            instances.append(pydicom.dcmread(os.path.join(fdir, fpath)))
+
+    if assoc.is_established:
+        # Use the C-STORE service to send the dataset
+        # returns the response status as a pydicom Dataset
+        for ds in instances:
+            print(f'Sending: {ds.StudyInstanceUID}')
+            status = assoc.send_c_store(ds)
+
+            # Check the status of the storage request
+            if status:
+                # If the storage request succeeded this will be 0x0000
+                print('C-STORE request status: 0x{0:04x}'.format(status.Status))
+            else:
+                print('Connection timed out, was aborted or received invalid response')
+
+        # Release the association
+        assoc.release()
+    else:
+        print('Association rejected, aborted or never connected')
+        print('C-STORE Test Finished')
 
 
 if __name__ == '__main__':

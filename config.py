@@ -1,6 +1,7 @@
 # Local PACS configuration
 
 DEBUG = True
+USE_DEBUG_LOGGER = False
 IP = "0.0.0.0"
 PORT = 7001
 
