@@ -59,8 +59,8 @@ def run_test():
     # Create our Identifier (query) dataset
     ds = pydicom.Dataset()
     ds.PatientName = ''
-    ds.QueryRetrieveLevel = 'PATIENT'
-    ds.SeriesInstanceUID = ''
+    ds.QueryRetrieveLevel = 'STUDY'
+    ds.StudyInstanceUID = '1.2.40.0.13.1.1.1.10.89.12.24.20180420075337572.49257'
 
     # Associate with the peer AE at IP 127.0.0.1 and port 11112
     assoc = ae.associate("0.0.0.0", config.PORT)

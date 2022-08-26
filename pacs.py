@@ -56,6 +56,20 @@ def handle_move(event):
             else:
                 matching = [inst for inst in instances]
 
+    if ds.QueryRetrieveLevel == 'STUDY':
+        if 'StudyInstanceUID' in ds:
+            if ds.StudyInstanceUID not in ['*', '', '?']:
+                matching = [
+                    inst for inst in instances if inst.StudyInstanceUID == ds.StudyInstanceUID
+                ]
+            else:
+                matching = [inst for inst in instances]
+
+    if config.DEBUG:
+        print(len(matching))
+
+    matching = [m for m in matching if m.Modality in ['MG', 'CT']]
+
     if config.DEBUG:
         print(len(matching))
 
@@ -90,6 +104,15 @@ def handle_find(event):
             if ds.PatientName not in ['*', '', '?']:
                 matching = [
                     inst for inst in instances if inst.PatientName == ds.PatientName
+                ]
+            else:
+                matching = [inst for inst in instances]
+
+    if ds.QueryRetrieveLevel == 'STUDY':
+        if 'StudyInstanceUID' in ds:
+            if ds.StudyInstanceUID not in ['*', '', '?']:
+                matching = [
+                    inst for inst in instances if inst.StudyInstanceUID == ds.StudyInstanceUID
                 ]
             else:
                 matching = [inst for inst in instances]
