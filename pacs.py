@@ -1,6 +1,6 @@
 from pynetdicom import AE, evt, StoragePresentationContexts, \
     AllStoragePresentationContexts, ALL_TRANSFER_SYNTAXES, debug_logger
-from flask import Flask
+from flask import Flask, request
 
 import config
 import pydicom
@@ -159,15 +159,72 @@ def default_info():
     return report_string
 
 
+@app.route("/interactions", methods=['GET', 'POST'])
+def display_actions():
+    if request.method == 'POST':
+        ae = get_ae()
+
+        assoc = ae.associate(request.form['ip'], config.PORT)
+
+        instances = get_stored_instances()
+        instances = [ins for ins in instances if ins.StudyInstanceUID == request.form['study']]
+
+        if assoc.is_established:
+            for ds in instances:
+                print(f'Sending: {ds.StudyInstanceUID}')
+                status = assoc.send_c_store(ds)
+
+                if status:
+                    print('C-STORE request status: 0x{0:04x}'.format(status.Status))
+                else:
+                    print('Connection timed out, was aborted or received invalid response')
+
+            # Release the association
+            assoc.release()
+        else:
+            print('Association rejected, aborted or never connected')
+
+    instances = get_stored_instances()
+
+    studies = []
+    for instance in instances:
+        if instance.StudyInstanceUID not in studies:
+            studies.append(instance.StudyInstanceUID)
+
+    studies_string = [f'<option value="{s}">{s}</option>' for s in studies]
+    ip_string = [f'<option value="{s[0]}">{s[0]}</option>' for s in config.TRUSTED.values()]
+    return f"""
+    <!doctype html>
+    <title>Интерактивный функционал PACS</title>
+    <form method=post enctype=multipart/formdata>
+    <label for="name">Отправить мне C-STORE:</label><br>
+        <select id="study" name="study">{studies_string}</select>
+        <select id="ip" name="ip">{ip_string}</select>
+        <input type="submit">
+    </form>
+    """
+
+
 def run():
     handlers = [(evt.EVT_C_STORE, handle_store),
                 (evt.EVT_C_MOVE, handle_move),
                 (evt.EVT_C_FIND, handle_find)]
 
-    ae = AE()
-
     if config.USE_DEBUG_LOGGER:
         debug_logger()
+
+    ae = get_ae()
+
+    # if config.DEBUG:
+    #     for context in ae.requested_contexts:
+    #         print(context)
+
+    ae.start_server((config.IP, config.PORT), evt_handlers=handlers, block=False)
+    app.run(host=config.IP, port=config.PORT+2)
+
+
+def get_ae():
+    ae = AE()
 
     ae.add_supported_context('1.2.840.10008.5.1.4.1.2.1.1')
     ae.add_supported_context('1.2.840.10008.5.1.4.1.2.1.2')
@@ -184,7 +241,6 @@ def run():
         '1.2.840.10008.5.1.4.1.2.3.2',
         '1.2.840.10008.5.1.4.1.2.4.2',
     ]
-
     syntax_list = [
         # "1.2.840.10008.1.2",
         # "1.2.840.10008.1.2.1",
@@ -196,13 +252,7 @@ def run():
         ae.add_supported_context(context, syntax_list)
         for syntax in syntax_list:
             ae.add_requested_context(context, syntax)
-
-    # if config.DEBUG:
-    #     for context in ae.requested_contexts:
-    #         print(context)
-
-    ae.start_server((config.IP, config.PORT), evt_handlers=handlers, block=False)
-    app.run(host=config.IP, port=config.PORT+2)
+    return ae
 
 
 if __name__ == '__main__':
