@@ -168,6 +168,7 @@ def display_actions():
 
         instances = get_stored_instances()
         instances = [ins for ins in instances if ins.StudyInstanceUID == request.form['study']]
+        instances = [ins for ins in instances if ins.Modality in ['MG', 'CT']]
 
         if assoc.is_established:
             for ds in instances:
