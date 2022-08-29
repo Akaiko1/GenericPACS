@@ -248,8 +248,10 @@ def get_ae():
         "1.2.840.10008.1.2.4.70"
     ]
 
+    for context in AllStoragePresentationContexts:
+        ae.add_supported_context(context.abstract_syntax, ALL_TRANSFER_SYNTAXES)
+
     for context in contexts_list:
-        ae.add_supported_context(context, syntax_list)
         for syntax in syntax_list:
             ae.add_requested_context(context, syntax)
     return ae
